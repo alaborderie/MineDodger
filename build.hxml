@@ -1,4 +1,4 @@
 -lib heaps
 -cp src
--js MineDodger.js
+-js cordova/MineDodger.js
 -main Game

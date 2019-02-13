@@ -207,6 +207,7 @@ hxd_App.prototype = {
 	,__class__: hxd_App
 };
 var Game = function() {
+	this.username = "Catory";
 	this.tiles = [[null,null,null,null,null,null],[null,null,null,null,null,null],[null,null,null,null,null,null],[null,null,null,null,null,null],[null,null,null,null,null,null],[null,null,null,null,null,null]];
 	this.maxLevel = 0;
 	this.currentLevel = 0;
@@ -246,11 +247,18 @@ Game.prototype = $extend(hxd_App.prototype,{
 		};
 	}
 	,startGame: function() {
+		var _gthis = this;
 		var _this = this.startButton;
 		if(_this != null && _this.parent != null) {
 			_this.parent.removeChild(_this);
 		}
 		this.currentLevel = 1;
+		var request = new haxe_Http("https://us-central1-minedodger-e2861.cloudfunctions.net/username?username=" + this.username);
+		request.onData = function(data) {
+			_gthis.maxLevel = JSON.parse(data).maxLevel;
+			_gthis.updateScores();
+		};
+		request.request();
 		this.startLevel();
 	}
 	,updateScores: function() {
@@ -259,7 +267,7 @@ Game.prototype = $extend(hxd_App.prototype,{
 	}
 	,startLevel: function() {
 		this.updateScores();
-		this.hero = new entities_Hero(0,0);
+		this.hero = new entities_Hero(0,0,this.username);
 		var _g = 0;
 		var _g1 = [0,1,2,3,4,5];
 		while(_g < _g1.length) {
@@ -390,8 +398,15 @@ Game.prototype = $extend(hxd_App.prototype,{
 		}
 	}
 	,boom: function() {
+		var _gthis = this;
 		hxd_Window.getInstance().removeEventTarget($bind(this,this.onEvent));
 		this.maxLevel = this.currentLevel > this.maxLevel ? this.currentLevel : this.maxLevel;
+		var request = new haxe_Http("https://us-central1-minedodger-e2861.cloudfunctions.net/updateMaxLevel?username=" + this.hero.username + "&maxLevel=" + this.maxLevel);
+		request.onData = function(data) {
+			_gthis.maxLevel = JSON.parse(data).maxLevel;
+			_gthis.updateScores();
+		};
+		request.request();
 		this.currentLevel = 1;
 		this.startLevel();
 	}
@@ -473,6 +488,16 @@ Lambda.array = function(it) {
 		a.push(i1);
 	}
 	return a;
+};
+Lambda.exists = function(it,f) {
+	var x = $iterator(it)();
+	while(x.hasNext()) {
+		var x1 = x.next();
+		if(f(x1)) {
+			return true;
+		}
+	}
+	return false;
 };
 var List = function() {
 	this.length = 0;
@@ -1062,9 +1087,10 @@ entities_GameTile.prototype = {
 	}
 	,__class__: entities_GameTile
 };
-var entities_Hero = function(x,y) {
+var entities_Hero = function(x,y,username) {
 	this.x = x;
 	this.y = x;
+	this.username = username;
 };
 $hxClasses["entities.Hero"] = entities_Hero;
 entities_Hero.__name__ = ["entities","Hero"];
@@ -33666,6 +33692,136 @@ haxe_EntryPoint.run = function() {
 	var rqf = $window.requestAnimationFrame || $window.webkitRequestAnimationFrame || $window.mozRequestAnimationFrame;
 	rqf(haxe_EntryPoint.run);
 };
+var haxe_Http = function(url) {
+	this.url = url;
+	this.headers = new List();
+	this.params = new List();
+	this.async = true;
+	this.withCredentials = false;
+};
+$hxClasses["haxe.Http"] = haxe_Http;
+haxe_Http.__name__ = ["haxe","Http"];
+haxe_Http.prototype = {
+	request: function(post) {
+		var me = this;
+		me.responseData = null;
+		var r = this.req = js_Browser.createXMLHttpRequest();
+		var onreadystatechange = function(_) {
+			if(r.readyState != 4) {
+				return;
+			}
+			var s;
+			try {
+				s = r.status;
+			} catch( e ) {
+				s = null;
+			}
+			if(s != null && "undefined" !== typeof window) {
+				var protocol = window.location.protocol.toLowerCase();
+				var rlocalProtocol = new EReg("^(?:about|app|app-storage|.+-extension|file|res|widget):$","");
+				var isLocal = rlocalProtocol.match(protocol);
+				if(isLocal) {
+					if(r.responseText != null) {
+						s = 200;
+					} else {
+						s = 404;
+					}
+				}
+			}
+			if(s == undefined) {
+				s = null;
+			}
+			if(s != null) {
+				me.onStatus(s);
+			}
+			if(s != null && s >= 200 && s < 400) {
+				me.req = null;
+				me.onData(me.responseData = r.responseText);
+			} else if(s == null) {
+				me.req = null;
+				me.onError("Failed to connect or resolve host");
+			} else {
+				switch(s) {
+				case 12007:
+					me.req = null;
+					me.onError("Unknown host");
+					break;
+				case 12029:
+					me.req = null;
+					me.onError("Failed to connect to host");
+					break;
+				default:
+					me.req = null;
+					me.responseData = r.responseText;
+					me.onError("Http Error #" + r.status);
+				}
+			}
+		};
+		if(this.async) {
+			r.onreadystatechange = onreadystatechange;
+		}
+		var uri = this.postData;
+		if(uri != null) {
+			post = true;
+		} else {
+			var _g_head = this.params.h;
+			while(_g_head != null) {
+				var val = _g_head.item;
+				_g_head = _g_head.next;
+				var p = val;
+				if(uri == null) {
+					uri = "";
+				} else {
+					uri += "&";
+				}
+				var s1 = p.param;
+				var uri1 = encodeURIComponent(s1) + "=";
+				var s2 = p.value;
+				uri += uri1 + encodeURIComponent(s2);
+			}
+		}
+		try {
+			if(post) {
+				r.open("POST",this.url,this.async);
+			} else if(uri != null) {
+				var question = this.url.split("?").length <= 1;
+				r.open("GET",this.url + (question ? "?" : "&") + uri,this.async);
+				uri = null;
+			} else {
+				r.open("GET",this.url,this.async);
+			}
+		} catch( e1 ) {
+			if (e1 instanceof js__$Boot_HaxeError) e1 = e1.val;
+			me.req = null;
+			this.onError(e1.toString());
+			return;
+		}
+		r.withCredentials = this.withCredentials;
+		if(!Lambda.exists(this.headers,function(h) {
+			return h.header == "Content-Type";
+		}) && post && this.postData == null) {
+			r.setRequestHeader("Content-Type","application/x-www-form-urlencoded");
+		}
+		var _g_head1 = this.headers.h;
+		while(_g_head1 != null) {
+			var val1 = _g_head1.item;
+			_g_head1 = _g_head1.next;
+			var h1 = val1;
+			r.setRequestHeader(h1.header,h1.value);
+		}
+		r.send(uri);
+		if(!this.async) {
+			onreadystatechange(null);
+		}
+	}
+	,onData: function(data) {
+	}
+	,onError: function(msg) {
+	}
+	,onStatus: function(status) {
+	}
+	,__class__: haxe_Http
+};
 var haxe__$Int64__$_$_$Int64 = function(high,low) {
 	this.high = high;
 	this.low = low;
@@ -56923,6 +57079,18 @@ js__$Boot_HaxeError.__super__ = Error;
 js__$Boot_HaxeError.prototype = $extend(Error.prototype,{
 	__class__: js__$Boot_HaxeError
 });
+var js_Browser = function() { };
+$hxClasses["js.Browser"] = js_Browser;
+js_Browser.__name__ = ["js","Browser"];
+js_Browser.createXMLHttpRequest = function() {
+	if(typeof XMLHttpRequest != "undefined") {
+		return new XMLHttpRequest();
+	}
+	if(typeof ActiveXObject != "undefined") {
+		return new ActiveXObject("Microsoft.XMLHTTP");
+	}
+	throw new js__$Boot_HaxeError("Unable to create XMLHttpRequest object.");
+};
 var js_html__$CanvasElement_CanvasUtil = function() { };
 $hxClasses["js.html._CanvasElement.CanvasUtil"] = js_html__$CanvasElement_CanvasUtil;
 js_html__$CanvasElement_CanvasUtil.__name__ = ["js","html","_CanvasElement","CanvasUtil"];

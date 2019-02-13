@@ -27,6 +27,7 @@ class Game extends hxd.App {
     var currentLevelText: h2d.Text;
     var maxLevelText: h2d.Text;
     var hero: entities.Hero;
+    var username: String = 'Catory';
 
     override function init() {
         super.init();
@@ -52,6 +53,12 @@ class Game extends hxd.App {
     function startGame() {
         startButton.remove();
         currentLevel = 1;
+        var request = new haxe.Http('https://us-central1-minedodger-e2861.cloudfunctions.net/username?username=' + username);
+        request.onData = function (data: String) {
+            maxLevel = haxe.Json.parse(data).maxLevel;
+            updateScores();
+        };
+        request.request();
         startLevel();
     }
 
@@ -62,7 +69,7 @@ class Game extends hxd.App {
 
     function startLevel() {
         updateScores();
-        hero = new entities.Hero(0,0);
+        hero = new entities.Hero(0,0, username);
         for (y in [0, 1, 2, 3, 4, 5]) {
             for (x in [0, 1, 2, 3, 4, 5]) {
                 var tileType = entities.GameTile.GameTileTypeEnum.PATH;
@@ -170,6 +177,12 @@ class Game extends hxd.App {
     function boom() {
         hxd.Window.getInstance().removeEventTarget(onEvent);
         maxLevel = currentLevel > maxLevel ? currentLevel : maxLevel;
+        var request = new haxe.Http('https://us-central1-minedodger-e2861.cloudfunctions.net/updateMaxLevel?username=' + hero.username + '&maxLevel=' + maxLevel);
+        request.onData = function (data: String) {
+            maxLevel = haxe.Json.parse(data).maxLevel;
+            updateScores();
+        }
+        request.request();
         currentLevel = 1;
         startLevel();
     }
