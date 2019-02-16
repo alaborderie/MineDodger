@@ -13,7 +13,7 @@ class Game extends hxd.App {
     public static var instance:Game;
 
     var currentLevel:Int = 0;
-    var maxLevel: Int = 0;
+    var maxLevel:Int = 0;
     public var tiles:Array<Array<entities.GameTile>> = [
         [null, null, null, null, null, null],
         [null, null, null, null, null, null],
@@ -23,24 +23,50 @@ class Game extends hxd.App {
         [null, null, null, null, null, null]
     ];
     var world:h2d.Layers;
-    var startButton: h2d.Text;
-    var currentLevelText: h2d.Text;
-    var maxLevelText: h2d.Text;
-    var hero: entities.Hero;
-    var username: String = 'Catory';
+    var startButton:h2d.Text;
+    var usernameText:h2d.Text;
+    var usernameInput:h2d.TextInput;
+    var currentLevelText:h2d.Text;
+    var maxLevelText:h2d.Text;
+    var hero:entities.Hero;
+    var username:String;
 
     override function init() {
         super.init();
 
-        currentLevelText = new h2d.Text(hxd.res.DefaultFont.get(), s2d);
+        engine.backgroundColor = 0x202020;
+
+        var font = hxd.res.DefaultFont.get();
+
+        usernameText = new h2d.Text(font, s2d);
+        usernameText.setPosition(100, 400);
+        usernameText.text = "Enter your username here: (at least 3 characters long)";
+
+        usernameInput = new h2d.TextInput(font, s2d);
+        usernameInput.backgroundColor = 0x70707070;
+        usernameInput.setPosition(100, 415);
+
+        usernameInput.textColor = 0xAAAA;
+        usernameInput.inputWidth = 300;
+
+        usernameInput.onFocus = function(e) {
+            usernameInput.textColor = 0xFFFFFF;
+        }
+
+        usernameInput.onFocusLost = function(e) {
+            usernameInput.textColor = 0xAAAAAA;
+        }
+
+        currentLevelText = new h2d.Text(font, s2d);
         currentLevelText.setPosition(100, 50);
 
-        maxLevelText = new h2d.Text(hxd.res.DefaultFont.get(), s2d);
+        maxLevelText = new h2d.Text(font, s2d);
         maxLevelText.setPosition(600, 50);
 
-        startButton = new h2d.Text(hxd.res.DefaultFont.get(), s2d);
-        startButton.setPosition(300, 300);
+        startButton = new h2d.Text(font, s2d);
+        startButton.setPosition(450, 415);
         startButton.text = 'Click here to start playing';
+
         new h2d.Interactive(300, 100, startButton).onClick = function(event:hxd.Event) {
             startGame();
         }
@@ -51,15 +77,20 @@ class Game extends hxd.App {
     }
 
     function startGame() {
-        startButton.remove();
-        currentLevel = 1;
-        var request = new haxe.Http('https://us-central1-minedodger-e2861.cloudfunctions.net/username?username=' + username);
-        request.onData = function (data: String) {
-            maxLevel = haxe.Json.parse(data).maxLevel;
-            updateScores();
-        };
-        request.request();
-        startLevel();
+        username = usernameInput.text;
+        if (username.length > 2) {
+            startButton.remove();
+            usernameInput.remove();
+            usernameText.remove();
+            currentLevel = 1;
+            var request = new haxe.Http('https://us-central1-minedodger-e2861.cloudfunctions.net/username?username=' + username);
+            request.onData = function(data:String) {
+                maxLevel = haxe.Json.parse(data).maxLevel;
+                updateScores();
+            };
+            request.request();
+            startLevel();
+        }
     }
 
     function updateScores() {
@@ -69,7 +100,7 @@ class Game extends hxd.App {
 
     function startLevel() {
         updateScores();
-        hero = new entities.Hero(0,0, username);
+        hero = new entities.Hero(0, 0, username);
         for (y in [0, 1, 2, 3, 4, 5]) {
             for (x in [0, 1, 2, 3, 4, 5]) {
                 var tileType = entities.GameTile.GameTileTypeEnum.PATH;
@@ -99,7 +130,7 @@ class Game extends hxd.App {
             if (direction == 1 && y > 0) {
                 y--;
             }
-            if (direction > 1 && direction < 6 && x < 5){
+            if (direction > 1 && direction < 6 && x < 5) {
                 x++;
             }
             if (direction >= 6 && y < 5) {
@@ -132,7 +163,7 @@ class Game extends hxd.App {
         }
     }
 
-    function onEvent(event: hxd.Event) {
+    function onEvent(event:hxd.Event) {
         if (event.kind == hxd.Event.EventKind.EKeyDown) {
             if (event.keyCode == Key.DOWN && hero.y < 5) {
                 moveHero(HeroDirectionEnum.DOWN);
@@ -153,7 +184,7 @@ class Game extends hxd.App {
         hxd.Window.getInstance().addEventTarget(onEvent);
     }
 
-    function moveHero(direction: HeroDirectionEnum) {
+    function moveHero(direction:HeroDirectionEnum) {
         tiles[hero.y][hero.x].type = entities.GameTile.GameTileTypeEnum.PATH;
         tiles[hero.y][hero.x].update();
         switch(direction) {
@@ -178,7 +209,7 @@ class Game extends hxd.App {
         hxd.Window.getInstance().removeEventTarget(onEvent);
         maxLevel = currentLevel > maxLevel ? currentLevel : maxLevel;
         var request = new haxe.Http('https://us-central1-minedodger-e2861.cloudfunctions.net/updateMaxLevel?username=' + hero.username + '&maxLevel=' + maxLevel);
-        request.onData = function (data: String) {
+        request.onData = function(data:String) {
             maxLevel = haxe.Json.parse(data).maxLevel;
             updateScores();
         }

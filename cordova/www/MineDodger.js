@@ -207,7 +207,6 @@ hxd_App.prototype = {
 	,__class__: hxd_App
 };
 var Game = function() {
-	this.username = "Catory";
 	this.tiles = [[null,null,null,null,null,null],[null,null,null,null,null,null],[null,null,null,null,null,null],[null,null,null,null,null,null],[null,null,null,null,null,null],[null,null,null,null,null,null]];
 	this.maxLevel = 0;
 	this.currentLevel = 0;
@@ -223,24 +222,48 @@ Game.prototype = $extend(hxd_App.prototype,{
 	init: function() {
 		var _gthis = this;
 		hxd_App.prototype.init.call(this);
-		this.currentLevelText = new h2d_Text(hxd_res_DefaultFont.get(),this.s2d);
-		var _this = this.currentLevelText;
+		this.engine.backgroundColor = 2105376;
+		var font = hxd_res_DefaultFont.get();
+		this.usernameText = new h2d_Text(font,this.s2d);
+		var _this = this.usernameText;
 		_this.posChanged = true;
 		_this.x = 100;
 		_this.posChanged = true;
-		_this.y = 50;
-		this.maxLevelText = new h2d_Text(hxd_res_DefaultFont.get(),this.s2d);
-		var _this1 = this.maxLevelText;
+		_this.y = 400;
+		this.usernameText.set_text("Enter your username here: (at least 3 characters long)");
+		this.usernameInput = new h2d_TextInput(font,this.s2d);
+		this.usernameInput.set_backgroundColor(1886417008);
+		var _this1 = this.usernameInput;
 		_this1.posChanged = true;
-		_this1.x = 600;
+		_this1.x = 100;
 		_this1.posChanged = true;
-		_this1.y = 50;
-		this.startButton = new h2d_Text(hxd_res_DefaultFont.get(),this.s2d);
-		var _this2 = this.startButton;
+		_this1.y = 415;
+		this.usernameInput.set_textColor(43690);
+		this.usernameInput.inputWidth = 300;
+		this.usernameInput.onFocus = function(e) {
+			_gthis.usernameInput.set_textColor(16777215);
+		};
+		this.usernameInput.onFocusLost = function(e1) {
+			_gthis.usernameInput.set_textColor(11184810);
+		};
+		this.currentLevelText = new h2d_Text(font,this.s2d);
+		var _this2 = this.currentLevelText;
 		_this2.posChanged = true;
-		_this2.x = 300;
+		_this2.x = 100;
 		_this2.posChanged = true;
-		_this2.y = 300;
+		_this2.y = 50;
+		this.maxLevelText = new h2d_Text(font,this.s2d);
+		var _this3 = this.maxLevelText;
+		_this3.posChanged = true;
+		_this3.x = 600;
+		_this3.posChanged = true;
+		_this3.y = 50;
+		this.startButton = new h2d_Text(font,this.s2d);
+		var _this4 = this.startButton;
+		_this4.posChanged = true;
+		_this4.x = 450;
+		_this4.posChanged = true;
+		_this4.y = 415;
 		this.startButton.set_text("Click here to start playing");
 		new h2d_Interactive(300,100,this.startButton).onClick = function(event) {
 			_gthis.startGame();
@@ -248,18 +271,29 @@ Game.prototype = $extend(hxd_App.prototype,{
 	}
 	,startGame: function() {
 		var _gthis = this;
-		var _this = this.startButton;
-		if(_this != null && _this.parent != null) {
-			_this.parent.removeChild(_this);
+		this.username = this.usernameInput.text;
+		if(this.username.length > 2) {
+			var _this = this.startButton;
+			if(_this != null && _this.parent != null) {
+				_this.parent.removeChild(_this);
+			}
+			var _this1 = this.usernameInput;
+			if(_this1 != null && _this1.parent != null) {
+				_this1.parent.removeChild(_this1);
+			}
+			var _this2 = this.usernameText;
+			if(_this2 != null && _this2.parent != null) {
+				_this2.parent.removeChild(_this2);
+			}
+			this.currentLevel = 1;
+			var request = new haxe_Http("https://us-central1-minedodger-e2861.cloudfunctions.net/username?username=" + this.username);
+			request.onData = function(data) {
+				_gthis.maxLevel = JSON.parse(data).maxLevel;
+				_gthis.updateScores();
+			};
+			request.request();
+			this.startLevel();
 		}
-		this.currentLevel = 1;
-		var request = new haxe_Http("https://us-central1-minedodger-e2861.cloudfunctions.net/username?username=" + this.username);
-		request.onData = function(data) {
-			_gthis.maxLevel = JSON.parse(data).maxLevel;
-			_gthis.updateScores();
-		};
-		request.request();
-		this.startLevel();
 	}
 	,updateScores: function() {
 		this.currentLevelText.set_text("Current level: " + this.currentLevel);
@@ -9307,6 +9341,444 @@ h2d_Text.prototype = $extend(h2d_Drawable.prototype,{
 		this.addBounds(relativeTo,out,x,y,w,h);
 	}
 	,__class__: h2d_Text
+});
+var h2d_TextInput = function(font,parent) {
+	this.maxHistorySize = 100;
+	this.lastClick = 0.;
+	this.lastChange = 0.;
+	this.redo = [];
+	this.undo = [];
+	this.scrollX = 0;
+	this.cursorScroll = 0;
+	this.cursorBlink = 0.;
+	this.canEdit = true;
+	this.cursorBlinkTime = 0.5;
+	this.cursorIndex = -1;
+	var _gthis = this;
+	h2d_Text.call(this,font,parent);
+	this.interactive = new h2d_Interactive(0,0);
+	this.interactive.set_cursor(hxd_Cursor.TextInput);
+	this.interactive.onPush = function(e) {
+		_gthis.onPush(e);
+		if(!e.cancel && e.button == 0) {
+			if(!_gthis.interactive.hasFocus()) {
+				e.kind = hxd_EventKind.EFocus;
+				_gthis.onFocus(e);
+				e.kind = hxd_EventKind.EPush;
+				if(e.cancel) {
+					return;
+				}
+				_gthis.interactive.focus();
+			}
+			_gthis.cursorBlink = 0;
+			var startIndex = _gthis.textPos(e.relX,e.relY);
+			_gthis.cursorIndex = startIndex;
+			_gthis.selectionRange = null;
+			var pt = new h2d_col_Point();
+			var scene = _gthis.getScene();
+			scene.startDrag(function(e1) {
+				pt.x = e1.relX;
+				pt.y = e1.relY;
+				_gthis.globalToLocal(pt);
+				var index = _gthis.textPos(pt.x,pt.y);
+				if(index == startIndex) {
+					_gthis.selectionRange = null;
+				} else if(index < startIndex) {
+					_gthis.selectionRange = { start : index, length : startIndex - index};
+				} else {
+					_gthis.selectionRange = { start : startIndex, length : index - startIndex};
+				}
+				_gthis.selectionSize = 0;
+				_gthis.cursorIndex = index;
+				if(e1.kind == hxd_EventKind.ERelease || _gthis.getScene() != scene) {
+					scene.stopDrag();
+				}
+			});
+		}
+	};
+	this.interactive.onKeyDown = function(e2) {
+		_gthis.onKeyDown(e2);
+		_gthis.handleKey(e2);
+	};
+	this.interactive.onTextInput = function(e3) {
+		_gthis.onTextInput(e3);
+		_gthis.handleKey(e3);
+	};
+	this.interactive.onFocusLost = function(e4) {
+		_gthis.cursorIndex = -1;
+		_gthis.selectionRange = null;
+		_gthis.onFocusLost(e4);
+	};
+	this.interactive.onClick = function(e5) {
+		_gthis.onClick(e5);
+		if(e5.cancel) {
+			return;
+		}
+		var t = new Date().getTime() / 1000;
+		if(t - _gthis.lastClick < 0.3 && _gthis.text.length != 0) {
+			_gthis.selectionRange = { start : 0, length : _gthis.text.length};
+			_gthis.selectionSize = 0;
+			_gthis.cursorIndex = _gthis.text.length;
+		}
+		_gthis.lastClick = t;
+	};
+	this.interactive.onKeyUp = function(e6) {
+		_gthis.onKeyUp(e6);
+	};
+	this.interactive.onRelease = function(e7) {
+		_gthis.onRelease(e7);
+	};
+	this.interactive.onFocus = function(e8) {
+		_gthis.onFocus(e8);
+	};
+	this.interactive.onKeyUp = function(e9) {
+		_gthis.onKeyUp(e9);
+	};
+	this.interactive.onMove = function(e10) {
+		_gthis.onMove(e10);
+	};
+	this.interactive.onOver = function(e11) {
+		_gthis.onOver(e11);
+	};
+	this.interactive.onOut = function(e12) {
+		_gthis.onOut(e12);
+	};
+	this.interactive.set_cursor(hxd_Cursor.TextInput);
+	this.addChildAt(this.interactive,0);
+};
+$hxClasses["h2d.TextInput"] = h2d_TextInput;
+h2d_TextInput.__name__ = ["h2d","TextInput"];
+h2d_TextInput.__super__ = h2d_Text;
+h2d_TextInput.prototype = $extend(h2d_Text.prototype,{
+	constraintSize: function(width,height) {
+	}
+	,handleKey: function(e) {
+		if(e.cancel || this.cursorIndex < 0) {
+			return;
+		}
+		var oldIndex = this.cursorIndex;
+		var oldText = this.text;
+		var _g = e.keyCode;
+		switch(_g) {
+		case 8:
+			if(this.selectionRange != null) {
+				if(!this.canEdit) {
+					return;
+				}
+				this.beforeChange();
+				this.cutSelection();
+				this.onChange();
+			} else if(this.cursorIndex > 0 && this.canEdit) {
+				this.beforeChange();
+				this.cursorIndex--;
+				this.set_text(HxOverrides.substr(this.text,0,this.cursorIndex) + HxOverrides.substr(this.text,this.cursorIndex + 1,null));
+				this.onChange();
+			}
+			break;
+		case 13:case 108:
+			this.cursorIndex = -1;
+			this.interactive.blur();
+			return;
+		case 35:
+			this.cursorIndex = this.text.length;
+			break;
+		case 36:
+			this.cursorIndex = 0;
+			break;
+		case 37:
+			if(this.cursorIndex > 0) {
+				this.cursorIndex--;
+			}
+			break;
+		case 39:
+			if(this.cursorIndex < this.text.length) {
+				this.cursorIndex++;
+			}
+			break;
+		case 46:
+			if(this.selectionRange != null) {
+				if(!this.canEdit) {
+					return;
+				}
+				this.beforeChange();
+				this.cutSelection();
+				this.onChange();
+			} else if(this.cursorIndex < this.text.length && this.canEdit) {
+				this.beforeChange();
+				this.set_text(HxOverrides.substr(this.text,0,this.cursorIndex) + HxOverrides.substr(this.text,this.cursorIndex + 1,null));
+				this.onChange();
+			}
+			break;
+		case 89:
+			if(hxd_Key.isDown(17)) {
+				if(this.redo.length > 0 && this.canEdit) {
+					this.undo.push(this.curHistoryState());
+					this.setState(this.redo.pop());
+				}
+				return;
+			} else {
+				if(e.kind == hxd_EventKind.EKeyDown) {
+					return;
+				}
+				if(e.charCode != 0 && this.canEdit) {
+					if(!this.font.hasChar(e.charCode)) {
+						return;
+					}
+					this.beforeChange();
+					if(this.selectionRange != null) {
+						this.cutSelection();
+					}
+					this.set_text(HxOverrides.substr(this.text,0,this.cursorIndex) + String.fromCharCode(e.charCode) + HxOverrides.substr(this.text,this.cursorIndex,null));
+					this.cursorIndex++;
+					this.onChange();
+				}
+			}
+			break;
+		case 90:
+			if(hxd_Key.isDown(17)) {
+				if(this.undo.length > 0 && this.canEdit) {
+					this.redo.push(this.curHistoryState());
+					this.setState(this.undo.pop());
+				}
+				return;
+			} else {
+				if(e.kind == hxd_EventKind.EKeyDown) {
+					return;
+				}
+				if(e.charCode != 0 && this.canEdit) {
+					if(!this.font.hasChar(e.charCode)) {
+						return;
+					}
+					this.beforeChange();
+					if(this.selectionRange != null) {
+						this.cutSelection();
+					}
+					this.set_text(HxOverrides.substr(this.text,0,this.cursorIndex) + String.fromCharCode(e.charCode) + HxOverrides.substr(this.text,this.cursorIndex,null));
+					this.cursorIndex++;
+					this.onChange();
+				}
+			}
+			break;
+		default:
+			if(e.kind == hxd_EventKind.EKeyDown) {
+				return;
+			}
+			if(e.charCode != 0 && this.canEdit) {
+				if(!this.font.hasChar(e.charCode)) {
+					return;
+				}
+				this.beforeChange();
+				if(this.selectionRange != null) {
+					this.cutSelection();
+				}
+				this.set_text(HxOverrides.substr(this.text,0,this.cursorIndex) + String.fromCharCode(e.charCode) + HxOverrides.substr(this.text,this.cursorIndex,null));
+				this.cursorIndex++;
+				this.onChange();
+			}
+		}
+		this.cursorBlink = 0.;
+		if(hxd_Key.isDown(16) && this.text == oldText) {
+			if(this.cursorIndex == oldIndex) {
+				return;
+			}
+			if(this.selectionRange == null) {
+				this.selectionRange = oldIndex < this.cursorIndex ? { start : oldIndex, length : this.cursorIndex - oldIndex} : { start : this.cursorIndex, length : oldIndex - this.cursorIndex};
+			} else if(oldIndex == this.selectionRange.start) {
+				this.selectionRange.length += oldIndex - this.cursorIndex;
+				this.selectionRange.start = this.cursorIndex;
+			} else {
+				this.selectionRange.length += this.cursorIndex - oldIndex;
+			}
+			if(this.selectionRange.length == 0) {
+				this.selectionRange = null;
+			} else if(this.selectionRange.length < 0) {
+				this.selectionRange.start += this.selectionRange.length;
+				this.selectionRange.length = -this.selectionRange.length;
+			}
+			this.selectionSize = 0;
+		} else {
+			this.selectionRange = null;
+		}
+	}
+	,cutSelection: function() {
+		if(this.selectionRange == null) {
+			return false;
+		}
+		this.cursorIndex = this.selectionRange.start;
+		var end = this.cursorIndex + this.selectionRange.length;
+		this.set_text(HxOverrides.substr(this.text,0,this.cursorIndex) + HxOverrides.substr(this.text,end,null));
+		this.selectionRange = null;
+		return true;
+	}
+	,setState: function(h) {
+		this.set_text(h.t);
+		this.cursorIndex = h.c;
+		this.selectionRange = h.sel;
+		if(this.selectionRange != null) {
+			this.cursorIndex = this.selectionRange.start + this.selectionRange.length;
+		}
+	}
+	,curHistoryState: function() {
+		return { t : this.text, c : this.cursorIndex, sel : this.selectionRange == null ? null : { start : this.selectionRange.start, length : this.selectionRange.length}};
+	}
+	,beforeChange: function() {
+		var t = new Date().getTime() / 1000;
+		if(t - this.lastChange < 1) {
+			this.lastChange = t;
+			return;
+		}
+		this.lastChange = t;
+		this.undo.push(this.curHistoryState());
+		this.redo = [];
+		while(this.undo.length > this.maxHistorySize) this.undo.shift();
+	}
+	,getSelectedText: function() {
+		if(this.selectionRange == null) {
+			return null;
+		} else {
+			return HxOverrides.substr(this.text,this.selectionRange.start,this.selectionRange.length);
+		}
+	}
+	,set_text: function(t) {
+		h2d_Text.prototype.set_text.call(this,t);
+		if(this.cursorIndex > t.length) {
+			this.cursorIndex = t.length;
+		}
+		return t;
+	}
+	,set_font: function(f) {
+		h2d_Text.prototype.set_font.call(this,f);
+		this.cursorTile = h2d_Tile.fromColor(16777215,1,this.font.size);
+		this.cursorTile.dy = 2;
+		this.selectionTile = h2d_Tile.fromColor(3381759,0,this.font.lineHeight);
+		return f;
+	}
+	,initGlyphs: function(text,rebuild,handleAlign,lines) {
+		if(handleAlign == null) {
+			handleAlign = true;
+		}
+		if(rebuild == null) {
+			rebuild = true;
+		}
+		h2d_Text.prototype.initGlyphs.call(this,text,rebuild,handleAlign,lines);
+		if(rebuild) {
+			this.calcWidth += this.cursorTile.width;
+			if(this.inputWidth != null && this.calcWidth > this.inputWidth) {
+				this.calcWidth = this.inputWidth;
+			}
+		}
+	}
+	,textPos: function(x,y) {
+		x += this.scrollX;
+		var pos = 0;
+		while(pos < this.text.length) {
+			if(this.calcTextWidth(HxOverrides.substr(this.text,0,pos + 1)) > x) {
+				break;
+			}
+			++pos;
+		}
+		return pos;
+	}
+	,sync: function(ctx) {
+		var tmp = this.inputWidth != null ? this.inputWidth : this.maxWidth != null ? Math.ceil(this.maxWidth) : this.get_textWidth();
+		this.interactive.width = tmp;
+		this.interactive.height = this.font.lineHeight;
+		h2d_Text.prototype.sync.call(this,ctx);
+	}
+	,draw: function(ctx) {
+		if(this.inputWidth != null) {
+			var h = this.localToGlobal(new h2d_col_Point(this.inputWidth,this.font.lineHeight));
+			ctx.setRenderZone(this.absX,this.absY,h.x - this.absX,h.y - this.absY);
+		}
+		if(this.cursorIndex >= 0 && (this.text != this.cursorText || this.cursorIndex != this.cursorXIndex)) {
+			if(this.cursorIndex > this.text.length) {
+				this.cursorIndex = this.text.length;
+			}
+			this.cursorText = this.text;
+			this.cursorXIndex = this.cursorIndex;
+			this.cursorX = this.calcTextWidth(HxOverrides.substr(this.text,0,this.cursorIndex));
+			if(this.inputWidth != null && this.cursorX - this.scrollX >= this.inputWidth) {
+				this.scrollX = this.cursorX - this.inputWidth + 1;
+			} else if(this.cursorX < this.scrollX) {
+				this.scrollX = this.cursorX;
+			}
+		}
+		this.absX -= this.scrollX * this.matA;
+		this.absY -= this.scrollX * this.matC;
+		if(this.selectionRange != null) {
+			if(this.selectionSize == 0) {
+				this.selectionPos = this.calcTextWidth(HxOverrides.substr(this.text,0,this.selectionRange.start));
+				this.selectionSize = this.calcTextWidth(HxOverrides.substr(this.text,this.selectionRange.start,this.selectionRange.length));
+				if(this.selectionRange.start + this.selectionRange.length == this.text.length) {
+					this.selectionSize += this.cursorTile.width;
+				}
+			}
+			this.selectionTile.dx += this.selectionPos;
+			this.selectionTile.width += this.selectionSize;
+			this.emitTile(ctx,this.selectionTile);
+			this.selectionTile.dx -= this.selectionPos;
+			this.selectionTile.width -= this.selectionSize;
+		}
+		h2d_Text.prototype.draw.call(this,ctx);
+		this.absX += this.scrollX * this.matA;
+		this.absY += this.scrollX * this.matC;
+		if(this.cursorIndex >= 0) {
+			this.cursorBlink += ctx.elapsedTime;
+			if(this.cursorBlink % (this.cursorBlinkTime * 2) < this.cursorBlinkTime) {
+				this.cursorTile.dx += this.cursorX - this.scrollX;
+				this.emitTile(ctx,this.cursorTile);
+				this.cursorTile.dx -= this.cursorX - this.scrollX;
+			}
+		}
+		if(this.inputWidth != null) {
+			ctx.hasRenderZone = false;
+			ctx.engine.setRenderZone();
+		}
+	}
+	,focus: function() {
+		this.interactive.focus();
+	}
+	,hasFocus: function() {
+		return this.interactive.hasFocus();
+	}
+	,onOut: function(e) {
+	}
+	,onOver: function(e) {
+	}
+	,onMove: function(e) {
+	}
+	,onClick: function(e) {
+	}
+	,onPush: function(e) {
+	}
+	,onRelease: function(e) {
+	}
+	,onKeyDown: function(e) {
+	}
+	,onKeyUp: function(e) {
+	}
+	,onTextInput: function(e) {
+	}
+	,onFocus: function(e) {
+	}
+	,onFocusLost: function(e) {
+	}
+	,onChange: function() {
+	}
+	,drawRec: function(ctx) {
+		var old = this.interactive.visible;
+		this.interactive.set_visible(false);
+		this.interactive.draw(ctx);
+		h2d_Text.prototype.drawRec.call(this,ctx);
+		this.interactive.set_visible(true);
+	}
+	,get_backgroundColor: function() {
+		return this.interactive.backgroundColor;
+	}
+	,set_backgroundColor: function(v) {
+		return this.interactive.backgroundColor = v;
+	}
+	,__class__: h2d_TextInput
 });
 var h2d_Tile = function(tex,x,y,w,h,dx,dy) {
 	if(dy == null) {
